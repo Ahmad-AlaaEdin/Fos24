@@ -69,7 +69,7 @@ void print_blocks_list(struct MemBlock_LIST list)
 	cprintf("\nDynAlloc Blocks List:\n");
 	LIST_FOREACH(blk, &list)
 	{
-		cprintf("(size: %d, isFree: %d)\n", get_block_size(blk), is_free_block(blk));
+		cprintf("(Address :%x size: %d, isFree: %d)\n", (uint32 *)blk, get_block_size(blk), is_free_block(blk));
 	}
 	cprintf("=========================================\n");
 }
@@ -87,6 +87,7 @@ bool is_initialized = 0;
 //==================================
 void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpace)
 {
+
 	//==================================================================================
 	// DON'T CHANGE THESE LINES==========================================================
 	//==================================================================================
@@ -97,6 +98,7 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 			return;
 		is_initialized = 1;
 	}
+	cprintf("initSizeOfAllocatedSpace%d", initSizeOfAllocatedSpace);
 	//==================================================================================
 	//==================================================================================
 
@@ -111,8 +113,17 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 	*header = *footer = initSizeOfAllocatedSpace - (2 * sizeof(uint32));
 
 	LIST_INIT(&freeBlocksList);
-	struct BlockElement *newBlock = (struct BlockElement *)(daStart + 2 * sizeof(uint32));
+	struct BlockElement *newBlock = (struct BlockElement *)(daStart + 8);
 	LIST_INSERT_HEAD(&freeBlocksList, newBlock);
+
+	struct BlockElement *id;
+	int idx = 0;
+	LIST_FOREACH(id, &freeBlocksList)
+	{
+
+		cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)id));
+		idx++;
+	}
 }
 //==================================
 // [2] SET BLOCK HEADER & FOOTER:
@@ -122,9 +133,17 @@ void set_block_data(void *va, uint32 totalSize, bool isAllocated)
 	// TODO: [PROJECT'24.MS1 - #05] [3] DYNAMIC ALLOCATOR - set_block_data
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("set_block_data is not implemented yet");
-	uint32 *header = (uint32 *)va - sizeof(uint32);
-	uint32 *footer = (uint32 *)(va + totalSize - (2 * sizeof(uint32)));
+	cprintf("va %p\n", (void *)va);
+	cprintf("totalSize %d\n", totalSize);
+	uint32 *header = (uint32 *)((uint8 *)va - sizeof(uint32)); // Move back by 4 bytes
+	uint32 *footer = (uint32 *)((uint8 *)va + totalSize - 8);
+
 	*header = *footer = totalSize + isAllocated;
+	cprintf("header %p\n", *header);
+	cprintf("footer %p\n", *footer);
+
+	cprintf("header l %p\n", header);
+	cprintf("footer l %p\n", footer);
 }
 
 //=========================================
@@ -153,8 +172,78 @@ void *alloc_block_FF(uint32 size)
 
 	// TODO: [PROJECT'24.MS1 - #06] [3] DYNAMIC ALLOCATOR - alloc_block_FF
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("alloc_block_FF is not implemented yet");
-	// Your Code is Here...
+	// panic("alloc_block_FF is not implemented yet");
+	uint32 totalSize = size + 2 * sizeof(uint32);
+	struct BlockElement *iterator;
+	uint32 *blockSize;
+	struct BlockElement *i;
+	struct BlockElement *id;
+	cprintf("	size:%p \n\n", totalSize);
+
+	LIST_FOREACH(iterator, &freeBlocksList)
+	{
+		// iterator -= sizeof(uint32);
+
+		blockSize = ((uint32 *)iterator - 1);
+		cprintf("	*blockSize:%d \n\n", *blockSize);
+		if (*blockSize % 2 == 1 || *blockSize < totalSize)
+			continue;
+		if (*blockSize % 2 == 0 && *blockSize == totalSize)
+		{
+			cprintf("11\n");
+			set_block_data(iterator, *blockSize, 1);
+			LIST_REMOVE(&freeBlocksList, iterator);
+			return iterator;
+		}
+		if (*blockSize % 2 == 0 && (*blockSize - totalSize <= 16 && *blockSize - totalSize >= 0))
+		{
+			cprintf("22\n");
+			set_block_data(iterator, *blockSize, 1);
+			LIST_REMOVE(&freeBlocksList, iterator);
+			return iterator;
+		}
+
+		if (*blockSize >= totalSize && *blockSize <= totalSize + 2 * sizeof(uint32))
+		{
+			cprintf("	1: \n\n");
+			set_block_data(iterator, *blockSize, 1);
+			return iterator;
+		}
+		else
+		{
+			cprintf("	2: \n\n");
+			uint32 newSize = *blockSize - totalSize;
+			uint8 *newPointer = (uint8 *)iterator + totalSize;
+			struct BlockElement *newBlock = (struct BlockElement *)newPointer;
+			set_block_data(iterator, totalSize, 1);
+			set_block_data(newPointer, newSize, 0);
+			/*cprintf("	iterator:%p \n\n", iterator);
+			cprintf("	iterator:%p \n\n", newPointer);
+			cprintf("	newSize:%d \n\n", newSize);
+			cprintf("	(uint8 *)iterator + totalSize + sizeof(uint32):%p \n\n", (uint8 *)iterator + totalSize + sizeof(uint32));
+			cprintf("	totalSize:%d \n\n", totalSize);
+			cprintf("	remainingSize:%d \n\n", *blockSize - (totalSize / sizeof(uint32)));
+			cprintf("	newBlock:%p \n\n", (uint32 *)newBlock);*/
+			LIST_INSERT_AFTER(&freeBlocksList, iterator, newBlock);
+			int idx = 0;
+			/*LIST_FOREACH(id, &freeBlocksList)
+			{
+
+				cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)id));
+				idx++;
+			}*/
+			LIST_REMOVE(&freeBlocksList, iterator);
+			idx = 0;
+			/*LIST_FOREACH(i, &freeBlocksList)
+			{
+
+				cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)i));
+				idx++;
+			}*/
+			return iterator;
+		}
+	}
+	return NULL;
 }
 //=========================================
 // [4] ALLOCATE BLOCK BY BEST FIT:
@@ -174,8 +263,75 @@ void free_block(void *va)
 {
 	// TODO: [PROJECT'24.MS1 - #07] [3] DYNAMIC ALLOCATOR - free_block
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
-	panic("free_block is not implemented yet");
-	// Your Code is Here...
+	// panic("free_block is not implemented yet");
+	uint32 blockSize = get_block_size(va);
+	struct BlockElement *curBlock = (struct BlockElement *)va;
+	struct BlockElement *nextBlock = NULL;
+	struct BlockElement *prevBlock = NULL;
+	uint32 nextSize = *((uint32 *)((uint8 *)va + blockSize - sizeof(uint32)));
+	uint32 prevSize = *((uint32 *)((uint8 *)va - 2 * sizeof(uint32)));
+	cprintf("va:%p\n", va);
+	cprintf("size:%d\n", blockSize);
+	cprintf("next:%p\n", (uint32 *)((uint8 *)va + blockSize - sizeof(uint32)));
+	cprintf("isFree:%d\n", *((uint32 *)((uint8 *)va + blockSize - sizeof(uint32))));
+	cprintf("prev:%p\n", (uint32 *)((uint8 *)va - 2 * sizeof(uint32)));
+	cprintf("isFree:%d\n", *((uint32 *)((uint8 *)va - 2 * sizeof(uint32))));
+
+	if (prevSize % 2 == 0)
+		prevBlock = (struct BlockElement *)(uint32 *)((uint8 *)va - prevSize);
+	if (nextSize % 2 == 0)
+		nextBlock = (struct BlockElement *)(uint32 *)((uint8 *)va + blockSize);
+
+	if (prevSize % 2 == 0 && nextSize % 2 == 0)
+	{
+		uint32 newSize = blockSize + prevSize + nextSize;
+		set_block_data((uint32 *)prevBlock, newSize, 0);
+		LIST_REMOVE(&freeBlocksList, nextBlock);
+		return;
+	}
+
+	if (prevSize % 2 == 0)
+	{
+
+		uint32 newSize = blockSize + prevSize;
+		set_block_data((uint32 *)prevBlock, newSize, 0);
+		return;
+	}
+	if (nextSize % 2 == 0)
+	{
+
+		uint32 newSize = blockSize + nextSize;
+		struct BlockElement *newBlock = (struct BlockElement *)(uint32 *)va;
+		LIST_INSERT_BEFORE(&freeBlocksList, curBlock, newBlock);
+		LIST_REMOVE(&freeBlocksList, nextBlock);
+		set_block_data((uint32 *)va, newSize, 0);
+		return;
+	}
+	set_block_data(va, blockSize, 0);
+	struct BlockElement *id;
+	int idx = 0;
+	struct BlockElement *iterator;
+	if (LIST_EMPTY(&freeBlocksList))
+	{
+		LIST_INSERT_HEAD(&freeBlocksList, curBlock);
+		return;
+	}
+
+	// Traverse the list to find the correct position for insertion
+	LIST_FOREACH(iterator, &freeBlocksList)
+	{
+		// If newBlock address is smaller than current iterator, insert before
+		if ((uint32 *)curBlock < (uint32 *)iterator)
+		{
+			LIST_INSERT_BEFORE(&freeBlocksList, iterator, curBlock);
+			return;
+		}
+	}
+
+	// If we reached here, it means newBlock has the highest address
+	// Insert it at the end of the list
+	LIST_INSERT_TAIL(&freeBlocksList, curBlock);
+	// print_blocks_list(freeBlocksList);
 }
 
 //=========================================
