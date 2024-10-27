@@ -64,14 +64,23 @@ void *alloc_block(uint32 size, int ALLOC_STRATEGY)
 
 void print_blocks_list(struct MemBlock_LIST list)
 {
-	// cprintf("=========================================\n");
+	cprintf("=========================================\n");
 	struct BlockElement *blk;
-	// cprintf("\nDynAlloc Blocks List:\n");
+	cprintf("\nDynAlloc Blocks List:\n");
 	LIST_FOREACH(blk, &list)
 	{
-		// cprintf("(Address :%x size: %d, isFree: %d)\n", (uint32 *)blk, get_block_size(blk), is_free_block(blk));
+		cprintf("(Address :%x size: %d, isFree: %d)\n", (uint32 *)blk, get_block_size(blk), is_free_block(blk));
 	}
-	// cprintf("=========================================\n");
+	cprintf("=========================================\n");
+	/*
+		cprintf("=========================================\n");
+		struct BlockElement *blk;
+		cprintf("\nDynAlloc Blocks List:\n");
+		LIST_FOREACH(blk, &list)
+		{
+			cprintf("(size: %d, isFree: %d)\n", get_block_size(blk), is_free_block(blk));
+		}
+		cprintf("=========================================\n");*/
 }
 //
 ////********************************************************************************//
@@ -116,14 +125,23 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 	struct BlockElement *newBlock = (struct BlockElement *)(daStart + 8);
 	LIST_INSERT_HEAD(&freeBlocksList, newBlock);
 
-	struct BlockElement *id;
-	int idx = 0;
-	LIST_FOREACH(id, &freeBlocksList)
-	{
-
-		// cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)id));
-		idx++;
-	}
+	// Reallocate Test
+	/*
+	print_blocks_list(freeBlocksList);
+	if (realloc_block_FF(NULL, 1024) != header + 1)
+		cprintf("1 Is Wrong\n");
+	print_blocks_list(freeBlocksList);
+	if (realloc_block_FF(header + 1, 0) != NULL)
+		cprintf("2 Is Wrong\n");
+	print_blocks_list(freeBlocksList);
+	if (realloc_block_FF(NULL, 0) != NULL)
+		cprintf("3 Is Wrong\n");
+	print_blocks_list(freeBlocksList);
+	realloc_block_FF(NULL, 1024);
+	print_blocks_list(freeBlocksList);
+	if (realloc_block_FF(header + 1, initSizeOfAllocatedSpace + 123456) != NULL)
+		cprintf("4 Is Wrong\n");
+	print_blocks_list(freeBlocksList);*/
 }
 //==================================
 // [2] SET BLOCK HEADER & FOOTER:
@@ -135,7 +153,7 @@ void set_block_data(void *va, uint32 totalSize, bool isAllocated)
 	// panic("set_block_data is not implemented yet");
 	// cprintf("va %p\n", (void *)va);
 	// cprintf("totalSize %d\n", totalSize);
-	uint32 *header = (uint32 *)((uint8 *)va - sizeof(uint32)); // Move back by 4 bytes
+	uint32 *header = (uint32 *)((uint8 *)va - sizeof(uint32));
 	uint32 *footer = (uint32 *)((uint8 *)va + totalSize - 8);
 
 	*header = *footer = totalSize + isAllocated;
@@ -176,13 +194,11 @@ void *alloc_block_FF(uint32 size)
 	uint32 totalSize = size + 2 * sizeof(uint32);
 	struct BlockElement *iterator;
 	uint32 *blockSize;
-	struct BlockElement *i;
-	struct BlockElement *id;
+
 	// cprintf("	size:%p \n\n", totalSize);
 
 	LIST_FOREACH(iterator, &freeBlocksList)
 	{
-		// iterator -= sizeof(uint32);
 
 		blockSize = ((uint32 *)iterator - 1);
 		// cprintf("	*blockSize:%d \n\n", *blockSize);
@@ -225,21 +241,8 @@ void *alloc_block_FF(uint32 size)
 			////cprintf("	remainingSize:%d \n\n", *blockSize - (totalSize / sizeof(uint32)));
 			////cprintf("	newBlock:%p \n\n", (uint32 *)newBlock);*/
 			LIST_INSERT_AFTER(&freeBlocksList, iterator, newBlock);
-			int idx = 0;
-			/*LIST_FOREACH(id, &freeBlocksList)
-			{
-
-				////cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)id));
-				idx++;
-			}*/
 			LIST_REMOVE(&freeBlocksList, iterator);
-			idx = 0;
-			/*LIST_FOREACH(i, &freeBlocksList)
-			{
 
-				////cprintf("###################  iterator:%d    = %p              ############\n", idx, ((uint32 *)i));
-				idx++;
-			}*/
 			return iterator;
 		}
 	}
@@ -261,7 +264,7 @@ void *alloc_block_BF(uint32 size)
 	uint32 totalSize = size + 8;
 	struct BlockElement *iterator;
 	struct BlockElement *curBlock = NULL;
-	uint32 curSize = (1024 * 1024 * 1024);
+	uint32 curSize = (0xffffffff);
 
 	LIST_FOREACH(iterator, &freeBlocksList)
 	{
@@ -285,7 +288,7 @@ void *alloc_block_BF(uint32 size)
 	// cprintf("	curBlock:%p \n\n", curBlock);
 	//   ////cprintf("	iterator:%p \n\n", newPointer);
 	// cprintf("	get_block_size(iterator):%d \n\n", get_block_size(curBlock));
-	print_blocks_list(freeBlocksList);
+	// print_blocks_list(freeBlocksList);
 	if (curBlock != NULL)
 	{
 		if (curSize >= totalSize && curSize - totalSize <= 16)
@@ -375,23 +378,24 @@ void free_block(void *va)
 	if (LIST_EMPTY(&freeBlocksList))
 	{
 		LIST_INSERT_HEAD(&freeBlocksList, curBlock);
-		return;
 	}
-
-	// Traverse the list to find the correct position for insertion
-	LIST_FOREACH(iterator, &freeBlocksList)
+	else
 	{
-		// If newBlock address is smaller than current iterator, insert before
-		if ((uint32 *)curBlock < (uint32 *)iterator)
+		bool inserted = 0;
+		LIST_FOREACH(iterator, &freeBlocksList)
 		{
-			LIST_INSERT_BEFORE(&freeBlocksList, iterator, curBlock);
-			return;
+
+			if ((uint32 *)curBlock < (uint32 *)iterator)
+			{
+				LIST_INSERT_BEFORE(&freeBlocksList, iterator, curBlock);
+				inserted = 1;
+				break;
+			}
 		}
+		if (inserted == 0)
+			LIST_INSERT_TAIL(&freeBlocksList, curBlock);
 	}
 
-	// If we reached here, it means newBlock has the highest address
-	// Insert it at the end of the list
-	LIST_INSERT_TAIL(&freeBlocksList, curBlock);
 	// print_blocks_list(freeBlocksList);
 }
 
@@ -436,7 +440,7 @@ void *realloc_block_FF(void *va, uint32 new_size)
 		if (blockSize - new_size < 16)
 			return va;
 		// cprintf("here 3:  \n");
-		//   Split
+		//    Split
 		uint32 totalSize = (blockSize + 8) - new_size;
 		uint8 *newPointer = (uint8 *)curBlock + new_size + 8;
 		struct BlockElement *newBlock = (struct BlockElement *)newPointer;
@@ -459,7 +463,7 @@ void *realloc_block_FF(void *va, uint32 new_size)
 			LIST_REMOVE(&freeBlocksList, nextBlock);
 			return va;
 		}
-		else if (nextSize - neededSize >= 0)
+		else if ((int)(nextSize - neededSize) >= 0 && (neededSize) >= 0)
 		{
 			// cprintf("here2 :  \n");
 			uint8 *newPointer = (uint8 *)nextBlock + neededSize;
@@ -473,6 +477,7 @@ void *realloc_block_FF(void *va, uint32 new_size)
 			return va;
 		}
 	}
+
 	void *address = alloc_block_FF(new_size);
 	if (address != NULL)
 	{
