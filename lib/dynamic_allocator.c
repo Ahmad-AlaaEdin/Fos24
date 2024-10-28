@@ -264,7 +264,7 @@ void *alloc_block_BF(uint32 size)
 	uint32 totalSize = size + 8;
 	struct BlockElement *iterator;
 	struct BlockElement *curBlock = NULL;
-	uint32 curSize = (0xffffffff);
+	uint32 curSize = DYN_ALLOC_MAX_SIZE;
 
 	LIST_FOREACH(iterator, &freeBlocksList)
 	{

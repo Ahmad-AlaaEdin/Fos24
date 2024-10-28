@@ -48,8 +48,13 @@ enum
 	SYS_check_WS_list,
 	SYS_utilities,
 	/*2024*/
-	//TODO: [PROJECT'24.MS1 - #02] [2] SYSTEM CALLS - Add suitable code here
-
+	// TODO: [PROJECT'24.MS1 - #02] [2] SYSTEM CALLS - Add suitable code here
+	Sys_Sbrk,
+	Sys_Free_User_Mem,
+	Sys_Allocate_User_Mem,
+	SYS_Check_Hard_Limit,
+	SYS_get_page_permission,
+	SYS_SetNice_limit,
 	//=====================================================================
 	NSYSCALLS
 };
