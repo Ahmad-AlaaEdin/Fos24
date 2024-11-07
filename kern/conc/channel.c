@@ -40,9 +40,10 @@ void sleep(struct Channel *chan, struct spinlock *lk)
 	currentProcess->channel = chan;
 	enqueue(&chan->queue, currentProcess);
 	release_spinlock(lk);
+	// switch process
 	sched();
 	release_spinlock(&ProcessQueues.qlock);
-
+	// reacquire after wakeup
 	acquire_spinlock(lk);
 }
 
@@ -65,6 +66,7 @@ void wakeup_one(struct Channel *chan)
 	{
 		process = dequeue(&chan->queue);
 		process->channel = NULL;
+		// add to ready queue
 		sched_insert_ready0(process);
 	}
 	release_spinlock(&ProcessQueues.qlock);
@@ -90,6 +92,7 @@ void wakeup_all(struct Channel *chan)
 	{
 		process = dequeue(&chan->queue);
 		process->channel = NULL;
+		// add to ready queue
 		sched_insert_ready0(process);
 	}
 	release_spinlock(&ProcessQueues.qlock);
