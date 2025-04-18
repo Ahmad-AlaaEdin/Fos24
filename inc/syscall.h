@@ -55,6 +55,10 @@ enum
 	SYS_Check_Hard_Limit,
 	SYS_get_page_permission,
 	SYS_SetNice_limit,
+	SYS_init_queue,
+	SYS_Enqueue,
+	SYS_Dequeue,
+
 	//=====================================================================
 	NSYSCALLS
 };

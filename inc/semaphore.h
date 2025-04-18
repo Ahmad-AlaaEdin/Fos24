@@ -6,13 +6,13 @@
 
 struct __semdata
 {
-	//queue of all blocked envs on this Semaphore
+	// queue of all blocked envs on this Semaphore
 	struct Env_Queue queue;
 
-	//semaphore value
+	// semaphore value
 	int count;
 
-	//lock variable protecting this count
+	// lock variable protecting this count
 	uint32 lock;
 
 	// For debugging: Name of semaphore.
@@ -20,10 +20,10 @@ struct __semdata
 };
 struct semaphore
 {
-	struct __semdata* semdata ;
+	struct __semdata *semdata;
 };
 struct semaphore create_semaphore(char *semaphoreName, uint32 value);
-struct semaphore get_semaphore(int32 ownerEnvID, char* semaphoreName);
+struct semaphore get_semaphore(int32 ownerEnvID, char *semaphoreName);
 
 void wait_semaphore(struct semaphore sem);
 void signal_semaphore(struct semaphore sem);

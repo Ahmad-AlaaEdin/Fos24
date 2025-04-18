@@ -318,3 +318,20 @@ void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 	syscall(Sys_Allocate_User_Mem, (uint32)virtual_address, (uint32)size, 0, 0, 0);
 	return;
 }
+
+void sys_enqueue(struct __semdata *data)
+{
+	syscall(SYS_Enqueue, (uint32)data, 0, 0, 0, 0);
+	return;
+}
+void sys_dequeue(struct __semdata *data)
+{
+	syscall(SYS_Dequeue, (uint32)data, 0, 0, 0, 0);
+	return;
+}
+
+void sys_init_queue(struct Env_Queue *queue)
+{
+	syscall(SYS_init_queue, (uint32)queue, 0, 0, 0, 0);
+	return;
+}

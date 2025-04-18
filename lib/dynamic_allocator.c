@@ -94,6 +94,8 @@ bool is_initialized = 0;
 //==================================
 // [1] INITIALIZE DYNAMIC ALLOCATOR:
 //==================================
+uint32 *BEG_BLOCK;
+uint32 *END_BLOCK;
 void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpace)
 {
 
@@ -114,13 +116,16 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 	// TODO: [PROJECT'24.MS1 - #04] [3] DYNAMIC ALLOCATOR - initialize_dynamic_allocator
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("initialize_dynamic_allocator is not implemented yet");
-	uint32 *beg = (uint32 *)daStart;
-	uint32 *end = (uint32 *)(daStart + initSizeOfAllocatedSpace - sizeof(uint32));
-	*beg = *end = 1;
+	BEG_BLOCK = (uint32 *)daStart;
+	*BEG_BLOCK = 1;
+
+	END_BLOCK = (uint32 *)(daStart + initSizeOfAllocatedSpace - sizeof(int));
+	*END_BLOCK = 1;
 	uint32 *header = (uint32 *)(daStart + sizeof(uint32));
 	uint32 *footer = (uint32 *)(daStart + initSizeOfAllocatedSpace - 2 * sizeof(uint32));
 	*header = *footer = initSizeOfAllocatedSpace - (2 * sizeof(uint32));
-
+	// cprintf("initSizeOfAllocatedSpace %d", initSizeOfAllocatedSpace);
+	// cprintf("footer %p", footer);
 	LIST_INIT(&freeBlocksList);
 	struct BlockElement *newBlock = (struct BlockElement *)(daStart + 8);
 	LIST_INSERT_HEAD(&freeBlocksList, newBlock);
@@ -172,6 +177,7 @@ void *alloc_block_FF(uint32 size)
 	//==================================================================================
 	// DON'T CHANGE THESE LINES==========================================================
 	//==================================================================================
+
 	{
 		if (size % 2 != 0)
 			size++; // ensure that the size is even (to use LSB as allocation flag)
@@ -187,6 +193,7 @@ void *alloc_block_FF(uint32 size)
 	}
 	//==================================================================================
 	//==================================================================================
+	// print_blocks_list(freeBlocksList);
 
 	// TODO: [PROJECT'24.MS1 - #06] [3] DYNAMIC ALLOCATOR - alloc_block_FF
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
@@ -195,7 +202,7 @@ void *alloc_block_FF(uint32 size)
 	struct BlockElement *iterator;
 	uint32 *blockSize;
 
-	// cprintf("	size:%p \n\n", totalSize);
+	// cprintf("	size:%d \n\n", totalSize);
 
 	LIST_FOREACH(iterator, &freeBlocksList)
 	{
@@ -211,18 +218,12 @@ void *alloc_block_FF(uint32 size)
 			LIST_REMOVE(&freeBlocksList, iterator);
 			return iterator;
 		}
-		if (*blockSize % 2 == 0 && (*blockSize - totalSize <= 16 && *blockSize - totalSize >= 0))
-		{
-			// cprintf("22\n");
-			set_block_data(iterator, *blockSize, 1);
-			LIST_REMOVE(&freeBlocksList, iterator);
-			return iterator;
-		}
 
-		if (*blockSize >= totalSize && *blockSize <= totalSize + 2 * sizeof(uint32))
+		if (*blockSize >= totalSize && *blockSize < totalSize + (4 * sizeof(uint32)))
 		{
 			// cprintf("	1: \n\n");
 			set_block_data(iterator, *blockSize, 1);
+			LIST_REMOVE(&freeBlocksList, iterator);
 			return iterator;
 		}
 		else
@@ -233,6 +234,8 @@ void *alloc_block_FF(uint32 size)
 			struct BlockElement *newBlock = (struct BlockElement *)newPointer;
 			set_block_data(iterator, totalSize, 1);
 			set_block_data(newPointer, newSize, 0);
+			// cprintf("old : %p size :%d \n", iterator, totalSize);
+			// cprintf("new : %p size :%d\n", newPointer, newSize);
 			/*////cprintf("	iterator:%p \n\n", iterator);
 			////cprintf("	iterator:%p \n\n", newPointer);
 			////cprintf("	newSize:%d \n\n", newSize);
@@ -245,6 +248,30 @@ void *alloc_block_FF(uint32 size)
 
 			return iterator;
 		}
+	}
+	// cprintf("\nsbrk CALLL\n: ");
+	int neededSize = ROUNDUP(totalSize, PAGE_SIZE) / PAGE_SIZE;
+	// cprintf("#pages :%d", neededSize);
+	void *address = sbrk(neededSize);
+	if (address == (void *)-1)
+	{
+
+		return NULL;
+	}
+	else
+	{
+		// cprintf("sbrk : %p", address);
+		uint32 *end = (uint32 *)((uint8 *)address + (neededSize * PAGE_SIZE) - sizeof(uint32));
+		*end = 1;
+
+		// cprintf("new end ");
+		// cprintf("\nend %p\n", end);
+		set_block_data((uint32 *)address, (neededSize * PAGE_SIZE), 0);
+		// cprintf("hello\n");
+		// cprintf("total : %d\n", (neededSize * PAGE_SIZE));
+		free_block(address);
+
+		return alloc_block_FF(size);
 	}
 	return NULL;
 }
@@ -327,11 +354,15 @@ void free_block(void *va)
 	// TODO: [PROJECT'24.MS1 - #07] [3] DYNAMIC ALLOCATOR - free_block
 	// COMMENT THE FOLLOWING LINE BEFORE START CODING
 	// panic("free_block is not implemented yet");
+	// print_blocks_list(freeBlocksList);
+
 	uint32 blockSize = get_block_size(va);
 	struct BlockElement *curBlock = (struct BlockElement *)va;
 	struct BlockElement *nextBlock = NULL;
 	struct BlockElement *prevBlock = NULL;
+
 	uint32 nextSize = *((uint32 *)((uint8 *)va + blockSize - sizeof(uint32)));
+
 	uint32 prevSize = *((uint32 *)((uint8 *)va - 2 * sizeof(uint32)));
 	// cprintf("va:%p\n", va);
 	// cprintf("size:%d\n", blockSize);
@@ -339,7 +370,16 @@ void free_block(void *va)
 	// cprintf("isFree:%d\n", *((uint32 *)((uint8 *)va + blockSize - sizeof(uint32))));
 	// cprintf("prev:%p\n", (uint32 *)((uint8 *)va - 2 * sizeof(uint32)));
 	// cprintf("isFree:%d\n", *((uint32 *)((uint8 *)va - 2 * sizeof(uint32))));
+	/*cprintf("Debug: va=%p, blockSize=%d, prevSize=%d, nextSize=%d\n",
+			va, blockSize, prevSize, nextSize);
 
+	// Debugging: Print free block list
+	cprintf("FreeBlocksList: ");
+	struct BlockElement *it;
+	LIST_FOREACH(it, &freeBlocksList)
+	{
+		cprintf("%p -> ", it);
+	}*/
 	if (prevSize % 2 == 0)
 		prevBlock = (struct BlockElement *)(uint32 *)((uint8 *)va - prevSize);
 	if (nextSize % 2 == 0)
@@ -362,15 +402,15 @@ void free_block(void *va)
 	}
 	if (nextSize % 2 == 0)
 	{
-		// cprintf("hereFree /n");
 
 		uint32 newSize = blockSize + nextSize;
 		struct BlockElement *newBlock = (struct BlockElement *)(uint32 *)va;
+		set_block_data((uint32 *)va, newSize, 0);
 		LIST_INSERT_BEFORE(&freeBlocksList, nextBlock, curBlock);
 		LIST_REMOVE(&freeBlocksList, nextBlock);
-		set_block_data((uint32 *)va, newSize, 0);
 		return;
 	}
+
 	set_block_data(va, blockSize, 0);
 	struct BlockElement *id;
 	int idx = 0;
@@ -395,8 +435,6 @@ void free_block(void *va)
 		if (inserted == 0)
 			LIST_INSERT_TAIL(&freeBlocksList, curBlock);
 	}
-
-	// print_blocks_list(freeBlocksList);
 }
 
 //=========================================

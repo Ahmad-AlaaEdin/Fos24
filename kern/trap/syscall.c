@@ -353,6 +353,42 @@ void sys_set_uheap_strategy(uint32 heapStrategy)
 /*******************************/
 //[PROJECT'24.MS3] ADD SUITABLE CODE HERE
 
+void sys_enqueue(struct __semdata *semdata)
+{
+
+	acquire_spinlock(&(ProcessQueues.qlock));
+	if (queue_size(&(semdata->queue)) != 0)
+	{
+		struct Env *nextEnv = dequeue(&(semdata->queue));
+		nextEnv->env_status = ENV_READY;
+		sched_insert_ready(nextEnv);
+	}
+
+	semdata->lock = 0;
+	release_spinlock(&(ProcessQueues.qlock));
+}
+void sys_dequeue(struct __semdata *semdata)
+{
+
+	struct Env *nextEnv = cur_env;
+	enqueue(&(semdata->queue), nextEnv);
+	acquire_spinlock(&(ProcessQueues.qlock));
+	nextEnv->env_status = ENV_BLOCKED;
+	semdata->lock = 0;
+	sched();
+	release_spinlock(&(ProcessQueues.qlock));
+}
+
+void sys_init_queue(struct Env_Queue *q)
+{
+	init_queue(q);
+}
+
+void sys_env_set_priority(int32 envID, int priority)
+{
+	env_set_priority(envID, priority);
+}
+
 /*******************************/
 /* SHARED MEMORY SYSTEM CALLS */
 /*******************************/
@@ -688,10 +724,21 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 		sys_utilities((char *)a1, (int)a2);
 		return 0;
 
+	case SYS_Enqueue:
+		sys_enqueue((struct __semdata *)a1);
+		break;
+	case SYS_Dequeue:
+		sys_dequeue((struct __semdata *)a1);
+		break;
+
+	case SYS_init_queue:
+		sys_init_queue((struct Env_Queue *)a1);
+		break;
+
 	case NSYSCALLS:
 		return -E_INVAL;
 		break;
 	}
-	// panic("syscall not implemented");
+
 	return -E_INVAL;
 }

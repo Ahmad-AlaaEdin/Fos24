@@ -67,7 +67,7 @@ void wakeup_one(struct Channel *chan)
 		process = dequeue(&chan->queue);
 		process->channel = NULL;
 		// add to ready queue
-		sched_insert_ready0(process);
+		sched_insert_ready(process);
 	}
 	release_spinlock(&ProcessQueues.qlock);
 }
@@ -93,7 +93,7 @@ void wakeup_all(struct Channel *chan)
 		process = dequeue(&chan->queue);
 		process->channel = NULL;
 		// add to ready queue
-		sched_insert_ready0(process);
+		sched_insert_ready(process);
 	}
 	release_spinlock(&ProcessQueues.qlock);
 }
